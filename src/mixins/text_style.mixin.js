@@ -130,20 +130,28 @@
     },
 
     /**
+     * Applies the 'styles' at given character 'index'
      * @private
+     * @param {Number} index
+     * @param {Object|String} styles can be 'superscript'/'subscript'
+     * @returns {fabric.Text} thisArg
+     * @chainable
      */
     _extendStyles: function(index, styles) {
-      var loc = this.get2DCursorLocation(index);
-
-      if (!this._getLineStyle(loc.lineIndex)) {
-        this._setLineStyle(loc.lineIndex, {});
+      var pos = this.get2DCursorLocation(index),
+          line = pos.lineIndex,
+          char = pos.charIndex;
+      if (typeof styles === 'string') {
+        var schema = this[styles];
+        if (schema && schema.baseline) {
+          this._setScript(line, char, schema);
+        }
+        return this;
       }
 
-      if (!this._getStyleDeclaration(loc.lineIndex, loc.charIndex)) {
-        this._setStyleDeclaration(loc.lineIndex, loc.charIndex, {});
-      }
-
-      fabric.util.object.extend(this._getStyleDeclaration(loc.lineIndex, loc.charIndex), styles);
+      var decl = this._getStyleDeclaration(line, char) || {};
+      fabric.util.object.extend(decl, styles);
+      return this._setStyleDeclaration(line, char, decl);
     },
 
     /**
@@ -254,22 +262,30 @@
      */
     getCompleteStyleDeclaration: function(lineIndex, charIndex) {
       var style = this._getStyleDeclaration(lineIndex, charIndex) || { },
-          styleObject = { }, prop;
-      for (var i = 0; i < this._styleProperties.length; i++) {
-        prop = this._styleProperties[i];
-        styleObject[prop] = typeof style[prop] === 'undefined' ? this[prop] : style[prop];
+          decl = { }, slate = this._styleProperties;
+      for (var i = 0, len = slate.length; i < len; i++) {
+        var prop = slate[i];
+        if (typeof style[prop] !== 'undefined') {
+          decl[prop] = style[prop];
+        }
+        else {
+          decl[prop] = prop === 'deltaY' ? 0 : this[prop];
+        }
       }
-      return styleObject;
+      return decl;
     },
 
     /**
+     * @private
      * @param {Number} lineIndex
      * @param {Number} charIndex
      * @param {Object} style
-     * @private
+     * @chainable
      */
     _setStyleDeclaration: function(lineIndex, charIndex, style) {
-      this.styles[lineIndex][charIndex] = style;
+      var decl = this._getLineStyle(lineIndex) || { };
+      decl[charIndex] = style;
+      return this._setLineStyle(lineIndex, decl);
     },
 
     /**
@@ -290,13 +306,15 @@
       return this.styles[lineIndex];
     },
 
-    /**
+     /**
+     * @private
      * @param {Number} lineIndex
      * @param {Object} style
-     * @private
+     * @chainable
      */
     _setLineStyle: function(lineIndex, style) {
       this.styles[lineIndex] = style;
+      return this;
     },
 
     /**
